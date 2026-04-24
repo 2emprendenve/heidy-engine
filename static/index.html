@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Micro SaaS 2 | Panel de Control</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <h1>Micro SaaS 2</h1>
+                <p>Propulsado por José Rafael Bravo León</p>
+            </div>
+            <div class="status-badge" id="motor-status">
+                <span class="dot"></span>
+                <span id="status-text">Detenido</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="stats-container">
+                <div class="phase-group">
+                    <h3>Fase 1: Apertura (PAZ)</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="label">Enviados</span>
+                            <h2 id="stat-f1-enviados">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Aperturas</span>
+                            <h2 id="stat-f1-aperturas">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Rebotes</span>
+                            <h2 id="stat-f1-rebotes">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Eliminados</span>
+                            <h2 id="stat-f1-eliminados">0</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="phase-group">
+                    <h3>Fase 2: Cierre (Blueprint)</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="label highlight">Interesados</span>
+                            <h2 id="stat-f2-interes">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Envíos Cierre</span>
+                            <h2 id="stat-f2-enviados">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label">Aperturas Cierre</span>
+                            <h2 id="stat-f2-aperturas">0</h2>
+                        </div>
+                        <div class="stat-card">
+                            <span class="label highlight">Vendidos ($600)</span>
+                            <h2 id="stat-f2-vendidos">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="control-panel">
+                <div class="card editor-card">
+                    <h3>Control Táctico por Fases</h3>
+                    <p class="subtitle">Ajusta el tono de José Rafael en tiempo real</p>
+
+                    <div class="prompt-tabs">
+                        <button class="tab-btn active" data-tab="apertura">Fase 1: Apertura (PAZ)</button>
+                        <button class="tab-btn" data-tab="cierre">Fase 2: Cierre (Blueprint)</button>
+                    </div>
+
+                    <div id="apertura-editor-wrap" class="editor-wrap">
+                        <textarea id="prompt-apertura-editor" spellcheck="false"
+                            placeholder="Cargando prompt de apertura..."></textarea>
+                    </div>
+                    <div id="cierre-editor-wrap" class="editor-wrap" style="display: none;">
+                        <textarea id="prompt-cierre-editor" spellcheck="false"
+                            placeholder="Cargando prompt de cierre..."></textarea>
+                    </div>
+
+                    <button id="save-prompts" class="btn secondary">Sincronizar Estrategia</button>
+                </div>
+
+                <div class="card terminal-card">
+                    <h3>Monitor en Tiempo Real</h3>
+                    <div id="log-container" class="terminal">
+                        <div class="log-line system">Sincronizando con el motor...</div>
+                    </div>
+                    <div class="actions">
+                        <button id="toggle-motor" class="btn primary">Iniciar Motor</button>
+                    </div>
+                </div>
+
+                <div class="card test-card">
+                    <h3>Prueba de Envío</h3>
+                    <p class="subtitle">Envía un correo de prueba manual ahora mismo</p>
+                    <div class="input-group">
+                        <input type="email" id="test-email-input" placeholder="ejemplo@correo.com">
+                        <button id="send-test-btn" class="btn secondary">Enviar Prueba</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,36 @@
+# ─── SECRETOS (NUNCA a GitHub) ───────────────────────────
+.env
+credentials.json
+sent_message_ids.json
+
+# ─── LOGS Y CACHE ────────────────────────────────────────
+*.log
+draft_cache.json
+__pycache__/
+*.pyc
+*.pyo
+
+# ─── ARCHIVOS TEMPORALES Y DE PRUEBA ─────────────────────
+*.zip
+PROMPT22.txt
+
+# ─── SCRIPTS DE TEST/DEBUG (no son necesarios en Render) ──
+check_ollama_api.py
+check_states.py
+debug_sheet.py
+fixed_call.py
+list_free_models.py
+run_test.py
+simulacion.py
+test_*.py
+verify_*.py
+test_blueprint_integration.py
+test_gemini_quota.py
+test_gemini_send.py
+test_openrouter_all.py
+test_openrouter_debug.py
+test_option5.py
+test_real_lead_email.py
+verify_connection.py
+verify_openrouter_new.py
+verify_orchestrator.py
