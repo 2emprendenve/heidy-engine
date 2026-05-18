@@ -13,19 +13,25 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 # ─────────────────────────────────────────────────────────
-# 1. API DE IA (Gemini 2.0 Flash + OpenRouter fallback)
+# 1. API DE IA (Vertex AI / Gemini AI Studio)
 # ─────────────────────────────────────────────────────────
 GEMINI_KEY:     str = os.getenv("GEMINI_KEY", "")
-GEMINI_MODEL:   str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")   # Cambiar a gemini-1.5-flash cuando se active
+GEMINI_MODEL:   str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 OPENROUTER_KEY: str = os.getenv("OPENROUTER_KEY", "")
 DEEPSEEK_KEY:   str = os.getenv("DEEPSEEK_KEY", "")
+
+# --- VERTEX AI CONFIG ---
+VERTEX_PROJECT_ID: str = os.getenv("VERTEX_PROJECT_ID", "")
+VERTEX_REGION:     str = os.getenv("VERTEX_REGION", "us-central1")
+VERTEX_JSON:       str = os.getenv("VERTEX_JSON", "")
+GEMINI_MODEL_VERTEX: str = os.getenv("GEMINI_MODEL_VERTEX", "gemini-1.5-flash-002")
 
 # ─────────────────────────────────────────────────────────
 # 2. GOOGLE SHEETS
 # ─────────────────────────────────────────────────────────
 GOOGLE_SHEET_ID: str = os.getenv("GOOGLE_SHEET_ID", "")
 GOOGLE_CREDS_JSON: str = os.getenv("GOOGLE_CREDS_JSON", str(BASE_DIR / "credentials.json"))
-SHEET_TAB_LEADS: str = os.getenv("SHEET_TAB_LEADS", "LIVE_EXTRACT")   # Cambiado a LIVE_EXTRACT por el Bridge MS1
+SHEET_TAB_LEADS: str = os.getenv("SHEET_TAB_LEADS", "1_OUTBOX_MICRO2")   # Bridge MS1 a MS2: Unicornio Blanco
 SHEET_TAB_RECIBIDOS: str = "MEMORIA_RECIBIDOS (2)"
 SHEET_TAB_INFINITA: str = "MEMORIA_INFINITA (2)"
 
@@ -33,13 +39,13 @@ SHEET_TAB_INFINITA: str = "MEMORIA_INFINITA (2)"
 # Nombres de columna detectados en tu Sheet Real (Base_Datos_Extractor_Unicornio)
 # Nombres de columna detectados en tu Sheet Real (Base_Datos_Extractor_Unicornio)
 # Nombres de columna esperados en la Google Sheet
-# Mapeo exacto para LIVE_EXTRACT (Micro-SaaS 1)
+# Mapeo exacto para 1_OUTBOX_MICRO2 (Micro-SaaS 1)
 COL_NOMBRE       = "EMPRESA"
 COL_EMAIL        = "EMAIL"
 COL_NICHO        = "NICHO"
 COL_DOLOR        = "ANÁLISIS_PSICOLÓGICO"
 COL_PRIORIDAD    = "PRIORIDAD"
-COL_ESTADO       = "ESTADO_CONTACTO"   # En LIVE_EXTRACT no existe, fallback activado
+COL_ESTADO       = "HEIDY_STATUS"   # Nueva columna limpia para evitar duplicados
 COL_APERTURA     = "APERTURA"
 COL_PROPUESTA_1  = "PROPUESTA_1"
 COL_PROPUESTA_2  = "PROPUESTA_2_ANTIGRAVITY"
@@ -57,7 +63,7 @@ COL_ANALISIS      = "ANÁLISIS_PSICOLÓGICO"
 COL_PITCH         = "PITCH_STRATEGY"
 COL_FRASE_EMPATIA = "FRASE_EMPATÍA"
 COL_NICHO_REAL    = "NICHO"
-COL_BUSINESS_NAME = "EMPRESA"   # Sincronizado con LIVE_EXTRACT
+COL_BUSINESS_NAME = "EMPRESA"   # Sincronizado con 1_OUTBOX_MICRO2
 
 # Estados permitidos (Arquitectura Orquestador)
 STATUS_READY              = "LISTO"

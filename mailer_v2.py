@@ -28,8 +28,21 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import config
+from metrics_v2 import MetricsLogger, EVT_F1_ENVIADO, EVT_F2_ENVIADO, EVT_ERROR
 
 logger = logging.getLogger(__name__)
+
+# Instancia global (o inicializada por el motor)
+_metrics_logger = None
+
+def get_metrics_logger(sheet_gc=None):
+    global _metrics_logger
+    if _metrics_logger is None and sheet_gc:
+        try:
+            _metrics_logger = MetricsLogger(sheet_gc)
+        except Exception as e:
+            logger.error(f"No se pudo inicializar MetricsLogger: {e}")
+    return _metrics_logger
 
 
 # ─────────────────────────────────────────────────────────
@@ -152,6 +165,8 @@ _EMAIL_TEMPLATE_HTML = """\
 
   <p class="pd">P.D. — {pd_urgencia}</p>
 
+  <img src="{pixel_url}" width="1" height="1" style="display:none;" alt="" />
+
 </body>
 </html>
 """
@@ -181,10 +196,15 @@ P.D. — {pd_urgencia}
 
 def build_email_body(lead: dict, ai_result: dict) -> tuple[str, str]:
     """
-    Construye el cuerpo del email usando los campos
-    generados por Claude con los 8 KPIs.
-    Retorna (plain_text, html_text).
+    Construye el texto plano y el HTML del correo.
+    Si la IA generó HTML puro (V2 Master Prompt), lo inyecta directo.
+    De lo contrario, usa la plantilla legacy.
     """
+    if "Propuesta_HTML" in ai_result:
+        html = ai_result["Propuesta_HTML"]
+        plain = "Please view this message in an HTML-compatible email client to see your Market Report."
+        return plain, html
+
     nombre = (lead.get(config.COL_BUSINESS_NAME)
               or lead.get(config.COL_NOMBRE, "Emprendedor"))
     primer_nombre = nombre.split()[0] if nombre else "Emprendedor"
@@ -197,6 +217,11 @@ def build_email_body(lead: dict, ai_result: dict) -> tuple[str, str]:
     pd_urgencia       = ai_result.get("PD_Urgencia", "")
     url_si            = ai_result.get("url_si", config.SERVER_BASE_URL + "/si")
     url_no            = ai_result.get("url_no", config.SERVER_BASE_URL + "/no")
+
+    import hashlib
+    email_lead = lead.get(config.COL_EMAIL, "")
+    token = hashlib.md5(f"{email_lead}{nombre}".encode()).hexdigest()[:12]
+    pixel_url = f"{config.SERVER_BASE_URL}/pixel?token={token}"
 
     # Limpiar P.D. duplicada antes de renderizar
     if pd_urgencia:
@@ -218,10 +243,14 @@ def build_email_body(lead: dict, ai_result: dict) -> tuple[str, str]:
         url_si=url_si,
         url_no=url_no,
         from_name=config.FROM_NAME,
+        pixel_url=pixel_url,
     )
 
     plain = _EMAIL_TEMPLATE_TXT.format(**context)
-    html  = _EMAIL_TEMPLATE_HTML.format(**context)
+    
+    # Preserve newlines in HTML by replacing \n with <br>
+    context_html = {k: str(v).replace("\n", "<br>") for k, v in context.items()}
+    html  = _EMAIL_TEMPLATE_HTML.format(**context_html)
     return plain, html
 
 
@@ -274,11 +303,28 @@ def send_email(lead: dict, ai_result: dict) -> bool:
             server.login(config.SMTP_USER, config.SMTP_PASS)
             server.sendmail(config.FROM_EMAIL, [to_email], msg.as_string())
 
-        logger.info(f"   ✉️  Enviado → {to_email} | Asunto: {subject}")
         # Registrar Message-ID para que listener_v2 detecte respuestas
         message_id = msg.get("Message-ID", "")
         if message_id:
             record_sent_id(message_id, lead)
+
+        # 📈 REGISTRO DE MÉTRICA REAL
+        try:
+            from engine_v2 import get_sheet
+            # Intentamos obtener la hoja para el logger si no existe
+            ml = get_metrics_logger() 
+            if not ml:
+                # Si no hay logger global, intentamos crear uno rápido
+                # Nota: Esto es un fallback, lo ideal es que el motor lo pase
+                pass 
+            
+            if ml:
+                phase = lead.get("_phase", 1)
+                evt = EVT_F1_ENVIADO if phase == 1 else EVT_F2_ENVIADO
+                ml.log(evt, lead, detalle=f"Asunto: {subject}")
+        except Exception as e:
+            logger.warning(f"No se pudo registrar la métrica del envío: {e}")
+
         return True
 
     except smtplib.SMTPAuthenticationError:

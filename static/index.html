@@ -1,119 +1,302 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micro SaaS 2 | Panel de Control</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>Heidy Engine | Control Panel</title>
+    <link rel="stylesheet" href="style.css?v=5">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ── Quantity Selector Pills ── */
+        .qty-section { margin: 18px 0 24px; }
+        .qty-label { font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+        .qty-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+        .qty-pill {
+            background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+            border-radius: 8px; padding: 6px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all .15s;
+        }
+        .qty-pill:hover { background: #1e3a5f; color: #60a5fa; border-color: #3b82f6; }
+        .qty-pill.active { background: #1e3a5f; color: #60a5fa; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+
+        /* ── Main Action Button ── */
+        .btn-main-action {
+            width: 100%; padding: 18px 24px; border-radius: 12px;
+            background: linear-gradient(135deg, #1e3a5f, #1e40af);
+            border: 1px solid #3b82f6; color: white;
+            font-size: 16px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: all .2s; margin-bottom: 16px;
+        }
+        .btn-main-action:hover { background: linear-gradient(135deg,#1e40af,#2563eb); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,.35); }
+        .btn-main-action .sub { display: block; font-size: 11px; font-weight: 400; color: #93c5fd; margin-top: 3px; }
+
+        /* ── Secondary Buttons ── */
+        .secondary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 4px; }
+        .btn-secondary {
+            padding: 12px 16px; border-radius: 10px; background: #1e293b;
+            border: 1px solid #334155; color: #94a3b8; font-size: 13px;
+            font-weight: 500; cursor: pointer; transition: all .2s; text-align: left;
+        }
+        .btn-secondary:hover { background: #1e3a5f; color: #e2e8f0; border-color: #475569; }
+        .btn-secondary .icon { font-size: 18px; display: block; margin-bottom: 4px; }
+
+        /* ── MODAL OVERLAY ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.80); z-index: 1000;
+            align-items: flex-start; justify-content: center;
+            padding: 24px; overflow-y: auto;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal-box {
+            background: #0f0f1a; border: 1px solid #2a2a4a;
+            border-radius: 16px; width: 100%; max-width: 980px;
+            padding: 28px; position: relative; margin: auto;
+        }
+        .modal-title { font-size: 18px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+        .modal-subtitle { font-size: 13px; color: #64748b; margin-bottom: 22px; }
+
+        /* ── Draft Cards ── */
+        .draft-grid { display: grid; gap: 10px; }
+        .draft-card {
+            background: #16213e; border: 1px solid #2a2a4a;
+            border-radius: 10px; padding: 14px;
+            display: grid; grid-template-columns: 1fr auto;
+            gap: 10px; align-items: center; transition: border-color .2s;
+        }
+        .draft-card.approved { border-color: #22c55e; background: #052e16; }
+        .draft-info .company { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+        .draft-info .email   { font-size: 11px; color: #64748b; margin: 2px 0; }
+        .draft-info .subject { font-size: 12px; color: #94a3b8; font-style: italic; }
+        .draft-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .btn-preview {
+            background: #1e3a5f; color: #60a5fa; border: none;
+            padding: 6px 12px; border-radius: 6px; font-size: 12px;
+            cursor: pointer; font-weight: 500;
+        }
+        .btn-approve {
+            background: #14532d; color: #4ade80; border: 1px solid #22c55e;
+            padding: 6px 14px; border-radius: 6px; font-size: 12px;
+            cursor: pointer; font-weight: 600; min-width: 90px; text-align: center;
+        }
+        .btn-approve.active { background: #052e16; }
+
+        /* ── Modal Footer ── */
+        .modal-footer {
+            margin-top: 22px; display: flex; align-items: center;
+            justify-content: space-between; gap: 10px;
+            border-top: 1px solid #2a2a4a; padding-top: 18px;
+            flex-wrap: wrap;
+        }
+        .approved-count { font-size: 13px; color: #94a3b8; }
+        .approved-count b { color: #4ade80; font-size: 16px; }
+        .footer-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-close-modal {
+            background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+            padding: 10px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+        }
+        .btn-approve-all {
+            background: #1e3a5f; color: #60a5fa; border: 1px solid #3b82f6;
+            padding: 10px 16px; border-radius: 8px; font-size: 13px;
+            cursor: pointer; font-weight: 600;
+        }
+        .btn-send-all {
+            background: linear-gradient(135deg,#16a34a,#15803d);
+            color: white; border: none; padding: 10px 22px;
+            border-radius: 8px; font-size: 14px; font-weight: 700;
+            cursor: pointer; opacity: .45; pointer-events: none; transition: opacity .2s;
+        }
+        .btn-send-all.ready { opacity: 1; pointer-events: all; }
+
+        /* ── Confirm Dialog ── */
+        .confirm-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.90); z-index: 3000;
+            align-items: center; justify-content: center;
+        }
+        .confirm-overlay.open { display: flex; }
+        .confirm-box {
+            background: #0f172a; border: 1px solid #3b82f6;
+            border-radius: 16px; padding: 32px 36px; max-width: 440px;
+            width: 100%; text-align: center;
+        }
+        .confirm-box h3 { color: #e2e8f0; font-size: 18px; margin-bottom: 12px; }
+        .confirm-box p  { color: #94a3b8; font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+        .confirm-btns { display: flex; gap: 12px; justify-content: center; }
+        .btn-confirm-cancel {
+            background: #1e293b; color: #94a3b8; border: 1px solid #334155;
+            padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer;
+        }
+        .btn-confirm-send {
+            background: linear-gradient(135deg,#16a34a,#15803d);
+            color: white; border: none; padding: 10px 28px;
+            border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer;
+        }
+
+        /* ── Preview Modal ── */
+        .preview-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.88); z-index: 2000;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .preview-overlay.open { display: flex; }
+        .preview-box {
+            background: #fff; border-radius: 12px;
+            width: 100%; max-width: 660px; height: 85vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .preview-header {
+            background: #0f172a; padding: 12px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .preview-header span { color: #94a3b8; font-size: 12px; font-family: Inter,sans-serif; }
+        .btn-close-preview {
+            background: #ef4444; color: white; border: none;
+            padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700;
+        }
+        .preview-iframe { flex: 1; border: none; width: 100%; }
+    </style>
 </head>
-
 <body>
-    <div class="container">
-        <header>
-            <div class="logo-area">
-                <h1>Micro SaaS 2</h1>
-                <p>Propulsado por José Rafael Bravo León</p>
+<div class="app-container">
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="logo">
+            <h1>Heidy Engine</h1>
+            <p>Cold Email Control Panel · Audit Mode</p>
+        </div>
+        <div class="status">
+            <div class="badge">
+                <span class="dot blue"></span>
+                <span>Leads disponibles: <strong id="val-totales">—</strong></span>
             </div>
-            <div class="status-badge" id="motor-status">
-                <span class="dot"></span>
-                <span id="status-text">Detenido</span>
+            <div class="badge">
+                <span class="dot green"></span>
+                <span>Enviados hoy: <strong id="val-enviados">0</strong></span>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <main>
-            <section class="stats-container">
-                <div class="phase-group">
-                    <h3>Fase 1: Apertura (PAZ)</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <span class="label">Enviados</span>
-                            <h2 id="stat-f1-enviados">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Aperturas</span>
-                            <h2 id="stat-f1-aperturas">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Rebotes</span>
-                            <h2 id="stat-f1-rebotes">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Eliminados</span>
-                            <h2 id="stat-f1-eliminados">0</h2>
-                        </div>
-                    </div>
-                </div>
+    <!-- MAIN -->
+    <main class="grid-acciones" style="display:block; max-width:700px; margin:0 auto;">
 
-                <div class="phase-group">
-                    <h3>Fase 2: Cierre (Blueprint)</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <span class="label highlight">Interesados</span>
-                            <h2 id="stat-f2-interes">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Envíos Cierre</span>
-                            <h2 id="stat-f2-enviados">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label">Aperturas Cierre</span>
-                            <h2 id="stat-f2-aperturas">0</h2>
-                        </div>
-                        <div class="stat-card">
-                            <span class="label highlight">Vendidos ($600)</span>
-                            <h2 id="stat-f2-vendidos">0</h2>
-                        </div>
-                    </div>
-                </div>
-            </section>
+        <!-- PASO 1: Selector de cantidad -->
+        <div class="qty-section">
+            <div class="qty-label">Paso 1 — ¿Cuántos correos redactar?</div>
+            <div class="qty-pills" id="qty-pills">
+                <!-- Generated by JS -->
+            </div>
+        </div>
 
-            <section class="control-panel">
-                <div class="card editor-card">
-                    <h3>Control Táctico por Fases</h3>
-                    <p class="subtitle">Ajusta el tono de José Rafael en tiempo real</p>
+        <!-- PASO 2: Botón principal -->
+        <button class="btn-main-action" onclick="openDraftModal()">
+            <span>📊</span>
+            <span>
+                Redactar & Revisar Borradores
+                <span class="sub" id="btn-main-sub">Genera correos con Gemini · revisa HTML · aprueba · envía</span>
+            </span>
+        </button>
 
-                    <div class="prompt-tabs">
-                        <button class="tab-btn active" data-tab="apertura">Fase 1: Apertura (PAZ)</button>
-                        <button class="tab-btn" data-tab="cierre">Fase 2: Cierre (Blueprint)</button>
-                    </div>
+        <!-- Botones secundarios -->
+        <div class="secondary-row">
+            <button class="btn-secondary" onclick="triggerAction('leads_disponibles')">
+                <span class="icon">📋</span>
+                Ver Leads Disponibles
+            </button>
+            <button class="btn-secondary" onclick="openMetricsModal()">
+                <span class="icon">📈</span>
+                Panel de Métricas
+            </button>
+            <button class="btn-secondary" onclick="triggerAction('prueba_especifica')">
+                <span class="icon">✉️</span>
+                Prueba a Mi Correo
+            </button>
+        </div>
+    </main>
 
-                    <div id="apertura-editor-wrap" class="editor-wrap">
-                        <textarea id="prompt-apertura-editor" spellcheck="false"
-                            placeholder="Cargando prompt de apertura..."></textarea>
-                    </div>
-                    <div id="cierre-editor-wrap" class="editor-wrap" style="display: none;">
-                        <textarea id="prompt-cierre-editor" spellcheck="false"
-                            placeholder="Cargando prompt de cierre..."></textarea>
-                    </div>
+    <!-- CONSOLA -->
+    <footer class="console" style="margin-top:24px;">
+        <div class="console-header">Terminal de Actividad</div>
+        <div class="console-body" id="log-container">
+            <div class="log-line">Sistema listo. Esperando comandos...</div>
+        </div>
+    </footer>
+</div>
 
-                    <button id="save-prompts" class="btn secondary">Sincronizar Estrategia</button>
-                </div>
+<!-- Toast -->
+<div id="toast" class="toast hidden">
+    <div id="toast-icon">✅</div>
+    <div id="toast-message">Acción completada.</div>
+</div>
 
-                <div class="card terminal-card">
-                    <h3>Monitor en Tiempo Real</h3>
-                    <div id="log-container" class="terminal">
-                        <div class="log-line system">Sincronizando con el motor...</div>
-                    </div>
-                    <div class="actions">
-                        <button id="toggle-motor" class="btn primary">Iniciar Motor</button>
-                    </div>
-                </div>
+<!-- ═══════════════ MODAL: REVISIÓN DE BORRADORES ═══════════════ -->
+<div id="draft-modal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title">📋 Revisión de Borradores</div>
+        <div class="modal-subtitle" id="draft-subtitle">Conectando con Gemini API — espera...</div>
 
-                <div class="card test-card">
-                    <h3>Prueba de Envío</h3>
-                    <p class="subtitle">Envía un correo de prueba manual ahora mismo</p>
-                    <div class="input-group">
-                        <input type="email" id="test-email-input" placeholder="ejemplo@correo.com">
-                        <button id="send-test-btn" class="btn secondary">Enviar Prueba</button>
-                    </div>
-                </div>
-            </section>
-        </main>
+        <div id="draft-list" class="draft-grid">
+            <div style="text-align:center;color:#64748b;padding:50px;">
+                ⏳ Generando correos con IA...
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <div class="approved-count">
+                Aprobados: <b id="approved-count">0</b>
+            </div>
+            <div class="footer-btns">
+                <button class="btn-close-modal" onclick="closeDraftModal()">✕ Cerrar</button>
+                <button class="btn-approve-all" onclick="approveAll()">✅ Aprobar Todos</button>
+                <button class="btn-send-all" id="btn-send-all" onclick="confirmSend()">
+                    🚀 Enviar 0 Aprobados
+                </button>
+            </div>
+        </div>
     </div>
+</div>
 
-    <script src="app.js"></script>
+<!-- ═══════════════ MODAL: CONFIRMACIÓN ENVÍO ═══════════════ -->
+<div id="confirm-modal" class="confirm-overlay">
+    <div class="confirm-box">
+        <h3>🚀 Confirmar Envío</h3>
+        <p id="confirm-text">¿Enviar correos a leads reales?<br>Esta acción no se puede deshacer.</p>
+        <div class="confirm-btns">
+            <button class="btn-confirm-cancel" onclick="closeConfirm()">Cancelar</button>
+            <button class="btn-confirm-send" onclick="sendApprovedDrafts()">✅ Sí, Enviar Ahora</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════ MODAL: PREVIEW EMAIL ═══════════════ -->
+<div id="preview-modal" class="preview-overlay">
+    <div class="preview-box">
+        <div class="preview-header">
+            <span id="preview-label">Vista previa del correo</span>
+            <button class="btn-close-preview" onclick="closePreview()">✕ Cerrar</button>
+        </div>
+        <iframe id="preview-iframe" class="preview-iframe" src="about:blank"></iframe>
+    </div>
+</div>
+
+<!-- ═══════════════ MODAL: MÉTRICAS ═══════════════ -->
+<div id="metrics-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 600px;">
+        <div class="modal-title">📈 Panel de Métricas Completas</div>
+        <div class="modal-subtitle">Estadísticas en tiempo real (Base de Datos + Buzón)</div>
+
+        <div id="metrics-content" style="background:#16213e; border:1px solid #2a2a4a; border-radius:10px; padding:20px; color:#e2e8f0; font-size:15px; line-height:1.8;">
+            <div style="text-align:center; color:#64748b; padding:40px;">⏳ Obteniendo datos reales...</div>
+        </div>
+
+        <div class="modal-footer" style="justify-content: flex-end;">
+            <button class="btn-close-modal" onclick="closeMetricsModal()">✕ Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script src="app.js?v=5"></script>
 </body>
-
 </html>

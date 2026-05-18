@@ -15,9 +15,10 @@ logger = logging.getLogger(__name__)
 def main_menu():
     while True:
         try:
+            import config
             sheet = get_sheet()
             leads_all = read_pending_leads(sheet, n=500)
-            leads_listos = [l for l in leads_all if l.get("ESTADO_CONTACTO") == "LISTO"]
+            leads_listos = [l for l in leads_all if l.get(config.COL_ESTADO) == "LISTO"]
 
             print("\n================================================")
             print("🎯 ANTIGRAVITY MAILER — PANEL DE CONTROL")
@@ -29,6 +30,7 @@ def main_menu():
             print("  [3] Generar Excel de auditoría (50 correos)")
             print("  [4] Enviar lote aprobado")
             print("  [5] Envío de prueba random a mi email")
+            print("  [6] AUTO-TEST END-TO-END (Envío rápido + simular click)")
             print("  [0] Salir")
             print("================================================")
 
@@ -274,6 +276,81 @@ def main_menu():
                         print(f"✅ Correo de prueba enviado a {email_destino}")
                     else:
                         print("❌ Error en el envío.")
+
+            elif choice == "6":
+                print("\n------------------------------------------------")
+                print("⚡ AUTO-TEST END-TO-END")
+                print("------------------------------------------------")
+                import os
+                import random
+                import requests
+                import urllib.parse
+                import config
+
+                email_destino = os.getenv("TEST_EMAIL", "").strip()
+                if not email_destino:
+                    email_destino = input("TEST_EMAIL no definido en .env. Introduce tu email: ").strip()
+                
+                sheet = get_sheet()
+                leads = read_pending_leads(sheet, n=50)
+
+                if not leads:
+                    print("❌ No hay leads pendientes.")
+                    continue
+
+                lead_random = random.choice(leads)
+                empresa = lead_random.get("EMPRESA", "Sin nombre")
+                print(f"\n🎲 Lead seleccionado al azar: {empresa}")
+                print(f"📧 Reemplazando destino con: {email_destino}")
+                
+                # Sobrescribir el email
+                lead_random["EMAIL"] = email_destino
+                
+                print("⚙️  Generando correo...")
+                results = generate_batch([lead_random])
+
+                if not results or results[0].get("ai_error"):
+                    print("❌ Error generando el correo.")
+                    continue
+
+                ai = results[0]
+                print(f"🚀 Enviando Correo 1 (Apertura) a {email_destino}...")
+                
+                if send_email(lead_random, ai):
+                    print("✅ Correo 1 enviado con éxito.")
+                    
+                    # Construir URL de tracking para simular click
+                    nombre_corto = " ".join(empresa.split()[:2])
+                    kpi4_val = lead_random.get("KPI_EFFICIENCY_GAP", "")
+                    kpi5_val = lead_random.get("KPI_RIVALRY", "")
+                    comp_val = lead_random.get("COMPETIDOR_NAME") or lead_random.get("COMPETITOR_NAME") or ""
+                    
+                    params = urllib.parse.urlencode({
+                        "email": email_destino,
+                        "name":  nombre_corto,
+                        "kpi4":  kpi4_val[:200] if kpi4_val else "",
+                        "kpi5":  kpi5_val[:200] if kpi5_val else "",
+                        "comp":  comp_val[:80]  if comp_val  else "",
+                    })
+                    track_url = f"{config.SERVER_BASE_URL}/track?{params}"
+                    
+                    print(f"\n🔗 Link de Tracking generado internamente:\n{track_url}")
+                    
+                    simular = input("\n¿Deseas simular el clic por consola AHORA (s) o prefieres ir a tu bandeja a leerlo y hacer clic tú mismo (n)? (s/n): ").strip().lower()
+                    if simular == "s":
+                        print(f"🌐 Haciendo GET a la nube de PythonAnywhere...")
+                        try:
+                            resp = requests.get(track_url, timeout=15)
+                            print(f"✅ Respuesta del servidor: HTTP {resp.status_code}")
+                            if resp.status_code == 200:
+                                print("🎉 ¡El click fue registrado exitosamente!")
+                                print("📩 Revisa tu bandeja de entrada en 10-20 segundos para ver el Correo 2 (El Regalo).")
+                            else:
+                                print("⚠️ El servidor no respondió con 200 OK.")
+                        except Exception as e:
+                            print(f"❌ Error simulando click: {e}")
+                else:
+                    print("❌ Error en el envío del Correo 1.")
 
             elif choice == "0":
                 print("Saliendo...")

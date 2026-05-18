@@ -12,6 +12,11 @@ import json
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+import requests
+import random
+import gspread
+import urllib.parse
+from google.oauth2.service_account import Credentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -191,6 +196,41 @@ async def health_check():
     return {"status": "ok", "motor": "Heidy Engine v2", "active": state.active}
 
 
+@app.get("/pixel")
+async def track_open(token: str = "", background_tasks: BackgroundTasks = None):
+    """
+    Píxel invisible 1x1 para rastrear aperturas.
+    Cambia el estado en Google Sheets a ABIERTO (o registra métrica).
+    """
+    lead = _token_registry.get(token)
+    if lead:
+        to_email = lead.get(config.COL_EMAIL, "")
+        nombre   = (lead.get(config.COL_BUSINESS_NAME) or lead.get(config.COL_NOMBRE, "there"))
+        fila     = lead.get(config.COL_FILA)
+        logging.info(f"👁️ APERTURA REGISTRADA — {nombre} ({to_email}) abrió el correo.")
+        
+        # Opcionalmente marcar en Sheets:
+        try:
+            spreadsheet = get_spreadsheet_cached()
+            sheet = spreadsheet.worksheet(config.SHEET_TAB_LEADS)
+            if fila:
+                from engine_v2 import mark_lead
+                is_outbox = lead.get("_is_outbox", True)
+                mark_lead(sheet, fila, "ABIERTO", is_outbox=is_outbox)
+                
+                # Métrica
+                ml = metrics_v2.MetricsLogger(spreadsheet)
+                ml.log("F1_APERTURA", lead, detalle="Apertura silenciosa por Píxel")
+        except Exception as e:
+            logging.error(f"   ✗ Error actualizando Sheet (Pixel): {e}")
+
+    # Devolver un GIF transparente de 1x1 píxel
+    pixel_data = b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b'
+    from fastapi import Response
+    return Response(content=pixel_data, media_type="image/gif")
+
+
+
 @app.get("/track")
 async def track_click(token: str = "", background_tasks: BackgroundTasks = None):
     """
@@ -367,6 +407,113 @@ async def save_prompts(data: dict):
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# ENDPOINTS PARA PANEL MINIMALISTA (Las 6 Opciones)
+# ==========================================
+import random
+from engine_v2 import get_sheet, read_pending_leads, generate_batch
+from mailer_v2 import send_email
+
+@app.get("/api/action/leads_disponibles")
+async def get_leads_disponibles():
+    try:
+        sheet = get_sheet()
+        leads_all = read_pending_leads(sheet, n=50)
+        leads_listos = [l for l in leads_all if str(l.get("ESTADO_CONTACTO", "")).upper() == "LISTO" or str(l.get("STATUS_ENVIO", "")).upper() == "PENDIENTE"]
+        return {"status": "success", "total": len(leads_all), "listos": len(leads_listos), "leads": leads_all[:10]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/action/prueba_especifica")
+async def action_prueba_especifica():
+    # Opción 1 simplificada: toma el primer lead disponible
+    try:
+        sheet = get_sheet()
+        leads = read_pending_leads(sheet, n=5)
+        if not leads: return {"status": "error", "message": "No hay leads"}
+        lead = leads[0]
+        email_destino = os.getenv("TEST_EMAIL", "").strip()
+        if email_destino: lead["EMAIL"] = email_destino
+        results = generate_batch([lead])
+        if results and not results[0].get("ai_error"):
+            if send_email(lead, results[0]):
+                return {"status": "success", "message": f"Prueba enviada para {lead.get('EMPRESA')} a {lead.get('EMAIL')}"}
+        return {"status": "error", "message": "Error generando o enviando."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/action/auditoria")
+async def action_auditoria():
+    try:
+        # Opción 3: Generar Excel (simplificado para UI, genera 10 para rapidez)
+        sheet = get_sheet()
+        leads = read_pending_leads(sheet, n=10)
+        if not leads: return {"status": "error", "message": "No hay leads"}
+        results = generate_batch(leads)
+        return {"status": "success", "message": f"Auditoría generada en logs para {len(results)} leads."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/action/prueba_random")
+async def action_prueba_random():
+    try:
+        sheet = get_sheet()
+        leads = read_pending_leads(sheet, n=50)
+        if not leads: return {"status": "error", "message": "No hay leads"}
+        lead = random.choice(leads)
+        email_destino = os.getenv("TEST_EMAIL", "").strip()
+        lead["EMAIL"] = email_destino
+        results = generate_batch([lead])
+        if results and not results[0].get("ai_error"):
+            if send_email(lead, results[0]):
+                return {"status": "success", "message": f"Enviado lead random ({lead.get('EMPRESA')}) a {email_destino}"}
+        return {"status": "error", "message": "Error enviando"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/action/autotest")
+async def action_autotest():
+    try:
+        import urllib.parse
+        import requests
+        sheet = get_sheet()
+        leads = read_pending_leads(sheet, n=50)
+        if not leads: return {"status": "error", "message": "No hay leads"}
+        lead = random.choice(leads)
+        email_destino = os.getenv("TEST_EMAIL", "").strip()
+        lead["EMAIL"] = email_destino
+        results = generate_batch([lead])
+        if results and not results[0].get("ai_error"):
+            if send_email(lead, results[0]):
+                nombre_corto = " ".join(lead.get("EMPRESA", "Lead").split()[:2])
+                kpi4_val = str(lead.get("KPI_EFFICIENCY_GAP") or "")
+                kpi5_val = str(lead.get("KPI_RIVALRY") or "")
+                comp_val = str(lead.get("COMPETIDOR_NAME") or lead.get("COMPETITOR_NAME") or "")
+                
+                params = urllib.parse.urlencode({
+                    "email": email_destino,
+                    "name":  nombre_corto,
+                    "kpi4":  kpi4_val[:200],
+                    "kpi5":  kpi5_val[:200],
+                    "comp":  comp_val[:80],
+                })
+                track_url = f"{config.SERVER_BASE_URL}/track?{params}"
+                try:
+                    requests.get(track_url, timeout=10)
+                    return {"status": "success", "message": "Correo 1 enviado y clic simulado (Regalo disparado)."}
+                except:
+                    return {"status": "success", "message": "Correo 1 enviado. Falló simulación de clic."}
+        return {"status": "error", "message": "Error enviando"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ==========================================
+# DRAFT REVIEW SYSTEM — importado limpio
+# ==========================================
+from drafts_api import register_drafts_routes
+register_drafts_routes(app, get_sheet, read_pending_leads, generate_batch, send_email)
+
 
 if __name__ == "__main__":
     import uvicorn

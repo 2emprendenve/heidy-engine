@@ -3,7 +3,7 @@
 
 Este sistema automatiza el contacto inicial con leads, la clasificación de respuestas y el seguimiento hacia un embudo de Kajabi, todo con un enfoque humanista y minimalista.
 
-## 🚀 Inicio Rápido
+## 🚀 Inicio Rápido8
 
 1.  **Instalar dependencias:**
     ```bash
