@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 import config
-import main
+
 import engine_v2
 import metrics_v2
 
@@ -175,16 +175,40 @@ async def get_metrics():
     return {**state.metrics_data, "active": state.active}
 
 # ─────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────
 # TRACKING DE CLICS — /track reemplaza /si y /no
 # ─────────────────────────────────────────────────────────
 
-# Diccionario en memoria: token → datos del lead
-# Se puebla cuando se genera el email en engine_v2
+import json
+import os
+
+TOKEN_DB_FILE = "tokens_db.json"
 _token_registry: dict = {}
+
+def load_tokens():
+    global _token_registry
+    if os.path.exists(TOKEN_DB_FILE):
+        try:
+            with open(TOKEN_DB_FILE, "r", encoding="utf-8") as f:
+                _token_registry = json.load(f)
+        except Exception as e:
+            import logging
+            logging.error(f"Error cargando tokens_db.json: {e}")
+
+load_tokens()
+
+def save_tokens():
+    try:
+        with open(TOKEN_DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(_token_registry, f, indent=2)
+    except Exception as e:
+        import logging
+        logging.error(f"Error guardando tokens_db.json: {e}")
 
 def register_token(token: str, lead_data: dict):
     """Registra el token de un lead para el seguimiento de clic."""
     _token_registry[token] = lead_data
+    save_tokens()
 
 @app.get("/health")
 async def health_check():
@@ -414,6 +438,64 @@ async def save_prompts(data: dict):
 import random
 from engine_v2 import get_sheet, read_pending_leads, generate_batch
 from mailer_v2 import send_email
+
+
+@app.get("/api/config/mode")
+async def get_mode():
+    """Devuelve el modo actual del motor (DRY_RUN y AUDIT_MODE)."""
+    return {
+        "dry_run":    config.DRY_RUN,
+        "audit_mode": config.AUDIT_MODE,
+    }
+
+
+@app.post("/api/config/mode")
+async def set_mode(data: dict):
+    """
+    Cambia DRY_RUN y/o AUDIT_MODE en caliente:
+      - Actualiza el módulo config en memoria (efecto inmediato)
+      - Reescribe el valor en el archivo .env (persistente tras reinicio)
+    """
+    import re as _re
+
+    cambios = {}
+
+    if "dry_run" in data:
+        nuevo_dr = bool(data["dry_run"])
+        config.DRY_RUN = nuevo_dr
+        cambios["dry_run"] = nuevo_dr
+
+    if "audit_mode" in data:
+        nuevo_am = bool(data["audit_mode"])
+        config.AUDIT_MODE = nuevo_am
+        cambios["audit_mode"] = nuevo_am
+
+    # Persistir en .env
+    try:
+        env_path = config.BASE_DIR / ".env"
+        env_text = env_path.read_text(encoding="utf-8")
+
+        if "dry_run" in cambios:
+            val = "true" if cambios["dry_run"] else "false"
+            if _re.search(r"^DRY_RUN=", env_text, _re.M):
+                env_text = _re.sub(r"^DRY_RUN=.*", f"DRY_RUN={val}", env_text, flags=_re.M)
+            else:
+                env_text += f"\nDRY_RUN={val}\n"
+
+        if "audit_mode" in cambios:
+            val = "true" if cambios["audit_mode"] else "false"
+            if _re.search(r"^AUDIT_MODE=", env_text, _re.M):
+                env_text = _re.sub(r"^AUDIT_MODE=.*", f"AUDIT_MODE={val}", env_text, flags=_re.M)
+            else:
+                env_text += f"\nAUDIT_MODE={val}\n"
+
+        env_path.write_text(env_text, encoding="utf-8")
+        logging.info(f"🔧 Modo cambiado: {cambios} (guardado en .env)")
+    except Exception as e:
+        logging.warning(f"⚠️ No se pudo persistir modo en .env: {e}")
+
+    return {"status": "success", "modos": cambios}
+
 
 @app.get("/api/action/leads_disponibles")
 async def get_leads_disponibles():
