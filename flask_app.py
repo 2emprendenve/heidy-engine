@@ -129,8 +129,41 @@ def track():
     if email:
         _send_correo2(email, name, kpi4, kpi5, competitor)
 
-    # 3. Redirigir a la landing de Heidy
-    return redirect(KAJABI_URL, code=302)
+    # 3. Bridge Page (Página Puente) en lugar de redirección brusca
+    bridge_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Report Sent!</title>
+    <style>
+        body {{ font-family: 'Georgia', serif; background-color: #f8f9fa; color: #1a1a1a; text-align: center; padding: 50px 20px; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+        h1 {{ color: #2c3e50; font-size: 24px; margin-bottom: 10px; }}
+        p {{ font-size: 16px; color: #555; line-height: 1.6; margin-bottom: 30px; }}
+        .btn {{ display: inline-block; background-color: #1a1a2e; color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-family: Arial, sans-serif; transition: background 0.3s; }}
+        .btn:hover {{ background-color: #3b5bdb; }}
+        .check-icon {{ font-size: 48px; margin-bottom: 20px; }}
+    </style>
+    <!-- Redirección automática después de 8 segundos -->
+    <meta http-equiv="refresh" content="8;url={KAJABI_URL}">
+</head>
+<body>
+    <div class="container">
+        <div class="check-icon">📊</div>
+        <h1>Your Report Is On Its Way!</h1>
+        <p>The remaining <strong>2 key indicators</strong> have just been sent to <strong>{email}</strong>. Please check your inbox in the next few minutes.</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+        
+        <p>While you wait, discover how other businesses are dominating their market with the <strong>2-Hour Workflow</strong> system.</p>
+        <a href="{KAJABI_URL}" class="btn">Show Me The Path &rarr;</a>
+        
+        <p style="font-size: 13px; color: #aaa; margin-top: 25px;">You will be redirected automatically in 8 seconds...</p>
+    </div>
+</body>
+</html>"""
+    return bridge_html
 
 @app.route("/pixel")
 def pixel():
