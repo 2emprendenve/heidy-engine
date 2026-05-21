@@ -186,6 +186,7 @@ def mark_lead_sent(sheet: gspread.Worksheet, lead: dict) -> None:
     try:
         from datetime import datetime
         headers = sheet.row_values(1)
+        nuevo_estado = "ENVIADO"  # FIX #5: valor por defecto para evitar NameError en rama is_outbox
         
         if is_outbox:
             col_estado = headers.index("STATUS_ENVIO") + 1
@@ -351,6 +352,11 @@ def build_prompt(lead: dict) -> str:
     # ── Ciudad y competidor ────────────
     ciudad            = (lead.get("CIUDAD") or lead.get("PRIORIDAD") or estado_geo or "tu zona").strip()
     competidor_nombre  = (lead.get("COMPETIDOR_NAME") or "").strip()
+    if not competidor_nombre and lead.get("KPI_CONTEXT"):
+        import re
+        match = re.search(r"Competidor:\s*([^|(\n]+)", lead.get("KPI_CONTEXT"), re.IGNORECASE)
+        if match:
+            competidor_nombre = match.group(1).strip()
     competidor_reseñas = (lead.get("COMPETIDOR_REVIEWS") or "").strip()
     
     sistema = sistema.replace("{ciudad}", ciudad)
@@ -387,7 +393,7 @@ def build_prompt(lead: dict) -> str:
     # Parámetros para PythonAnywhere (no necesita token registry en memoria)
     kpi4_val        = lead.get("KPI_EFFICIENCY_GAP", "")
     kpi5_val        = lead.get("KPI_RIVALRY", "")
-    comp_val        = lead.get("COMPETIDOR_NAME") or lead.get("COMPETITOR_NAME") or ""
+    comp_val        = lead.get("COMPETIDOR_NAME") or lead.get("COMPETITOR_NAME") or competidor_nombre or ""
     kpi_sent_val    = lead.get("KPI_SENTIMENT") or lead.get("RATING_DISPLAY") or f"{rating}★ / {reseñas} reviews"
     params = urllib.parse.urlencode({
         "email":         email,
@@ -713,12 +719,12 @@ def generate_batch(leads: list[dict], force_refresh: bool = False) -> list[dict]
         ]
         intentos_idioma = 0
         while intentos_idioma < 5:
-            # 1. Intentar Vertex AI (PREMIUM / CRÉDITOS)
-            ai_result = _call_vertex(prompt)
+            # 1. Usar Gemini 2.5 Flash Lite directamente (API Studio)
+            ai_result = _call_gemini(prompt)
             
-            # 2. Fallback a Gemini 1.5 Flash (AI STUDIO) si Vertex no está o falló
+            # 2. Fallback a Vertex si falla
             if ai_result is None:
-                ai_result = _call_gemini(prompt)
+                ai_result = _call_vertex(prompt)
             
             # 3. Fallback a OpenRouter
             if ai_result is None:
