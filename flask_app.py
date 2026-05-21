@@ -17,7 +17,9 @@ from email.mime.text import MIMEText
 from flask import Flask, request, redirect
 from dotenv import load_dotenv
 
-load_dotenv()  # Carga variables de entorno desde .env si existe
+# ── FIX CRÍTICO: Rutas absolutas para PythonAnywhere WSGI ──
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))  # Carga variables de entorno desde .env si existe
 
 app = Flask(__name__)
 
@@ -30,13 +32,12 @@ except ImportError:
     logging.warning("gspread no disponible — sincronización con Sheets desactivada.")
 
 # ─── CONFIGURACIÓN (leer desde variables de entorno) ──────────────────────────
-# FIX #4: Contraseña movida a variable de entorno para no exponerla en código
-# En PythonAnywhere: Settings > Environment Variables > SMTP_PASS = tu_app_password
 SMTP_USER   = os.getenv("SMTP_USER",   "dailypaywithheidy@gmail.com")
-SMTP_PASS   = os.getenv("SMTP_PASS",   "")   # ← NUNCA hardcodear aquí
+SMTP_PASS   = os.getenv("SMTP_PASS",   "")
 FROM_NAME   = os.getenv("FROM_NAME",   "Heidy Nalley")
 KAJABI_URL  = os.getenv("KAJABI_URL",  "https://www.dailypaywithheidy.com/")
-LOG_FILE    = "clics_log.txt"
+LOG_FILE    = os.path.join(BASE_DIR, "clics_log.txt")
+CREDENTIALS_FILE = os.path.join(BASE_DIR, "credentials.json")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "19QaGyRQzL7vMHCTpRGGV6iD-U6jntMUBQ2huSZIOrtU")
 
 def get_sheet(tab_name):
@@ -44,7 +45,7 @@ def get_sheet(tab_name):
         logging.warning("get_sheet: gspread no disponible, saltando.")
         return None
     try:
-        creds = Credentials.from_service_account_file('credentials.json', scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets"])
         gc = gspread.authorize(creds)
         ss = gc.open_by_key(GOOGLE_SHEET_ID)
         return ss.worksheet(tab_name)
