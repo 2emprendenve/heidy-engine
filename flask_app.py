@@ -15,15 +15,42 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from flask import Flask, request, redirect
+from dotenv import load_dotenv
+
+load_dotenv()  # Carga variables de entorno desde .env si existe
 
 app = Flask(__name__)
 
-# ─── CONFIGURACIÓN (editar aquí directamente) ─────────────────────────────────
-SMTP_USER   = "dailypaywithheidy@gmail.com"
-SMTP_PASS   = "exyjspwspqduzgtr"
-FROM_NAME   = "Heidy Nalley"
-KAJABI_URL  = "https://www.dailypaywithheidy.com/"
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+    _GSPREAD_OK = True
+except ImportError:
+    _GSPREAD_OK = False
+    logging.warning("gspread no disponible — sincronización con Sheets desactivada.")
+
+# ─── CONFIGURACIÓN (leer desde variables de entorno) ──────────────────────────
+# FIX #4: Contraseña movida a variable de entorno para no exponerla en código
+# En PythonAnywhere: Settings > Environment Variables > SMTP_PASS = tu_app_password
+SMTP_USER   = os.getenv("SMTP_USER",   "dailypaywithheidy@gmail.com")
+SMTP_PASS   = os.getenv("SMTP_PASS",   "")   # ← NUNCA hardcodear aquí
+FROM_NAME   = os.getenv("FROM_NAME",   "Heidy Nalley")
+KAJABI_URL  = os.getenv("KAJABI_URL",  "https://www.dailypaywithheidy.com/")
 LOG_FILE    = "clics_log.txt"
+GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID", "19QaGyRQzL7vMHCTpRGGV6iD-U6jntMUBQ2huSZIOrtU")
+
+def get_sheet(tab_name):
+    if not _GSPREAD_OK:
+        logging.warning("get_sheet: gspread no disponible, saltando.")
+        return None
+    try:
+        creds = Credentials.from_service_account_file('credentials.json', scopes=["https://www.googleapis.com/auth/spreadsheets"])
+        gc = gspread.authorize(creds)
+        ss = gc.open_by_key(GOOGLE_SHEET_ID)
+        return ss.worksheet(tab_name)
+    except Exception as e:
+        logging.error(f"Error conectando a sheets: {e}")
+        return None
 
 
 # ─── RUTA DE SALUD (para cron-job.org) ───────────────────────────────────────
@@ -51,10 +78,49 @@ def track():
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. Guardar el clic en el log
+    # 1. Guardar el clic en el log y sincronizar con Google Sheets
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"[{timestamp}] CLIC | Email: {email} | Name: {name} | Comp: {competitor}\n")
+            
+        # Sincronizar con Google Sheets (Métricas (2), MEMORIA_INFINITA (2), y marcar en leads)
+        try:
+            ws_metrics = get_sheet("Métricas (2)")
+            ws_infinita = get_sheet("MEMORIA_INFINITA (2)")
+            row = [timestamp, "F2_INTERES", email, name, "Desconocido", f"Clic en CTA (PythonAnywhere) | Comp: {competitor}"]
+            
+            if ws_metrics:
+                ws_metrics.append_row(row, value_input_option="USER_ENTERED")
+                # Incrementar el contador de logros en F1 (cell B6)
+                val = ws_metrics.acell('B6').value
+                ws_metrics.update_acell('B6', int(val) + 1 if val and val.isdigit() else 1)
+            
+            if ws_infinita:
+                ws_infinita.append_row(row, value_input_option="USER_ENTERED")
+                
+            # Marcar el lead como CLICKED en la pestaña de Leads ("1_OUTBOX_MICRO2")
+            ws_leads = get_sheet("1_OUTBOX_MICRO2")
+            if ws_leads and email:
+                try:
+                    headers = ws_leads.row_values(1)
+                    if "EMAIL" in headers:
+                        email_col = headers.index("EMAIL") + 1
+                        status_col = None
+                        if "HEIDY_STATUS" in headers:
+                            status_col = headers.index("HEIDY_STATUS") + 1
+                        elif "STATUS_ENVIO" in headers:
+                            status_col = headers.index("STATUS_ENVIO") + 1
+                            
+                        if status_col:
+                            for idx, val in enumerate(ws_leads.col_values(email_col), start=1):
+                                if val.strip().lower() == email.lower():
+                                    ws_leads.update_cell(idx, status_col, "CLICKED")
+                                    logging.info(f"   ✓ Lead {email} marcado como CLICKED en la fila {idx}")
+                                    break
+                except Exception as sheet_lead_err:
+                    logging.error(f"Error actualizando estado en leads: {sheet_lead_err}")
+        except Exception as sheet_err:
+            logging.error(f"Error sincronizando clic con Google Sheets: {sheet_err}")
     except Exception as e:
         logging.error(f"Error guardando log: {e}")
 
@@ -64,6 +130,47 @@ def track():
 
     # 3. Redirigir a la landing de Heidy
     return redirect(KAJABI_URL, code=302)
+
+@app.route("/pixel")
+def pixel():
+    """
+    Píxel invisible 1x1 para rastrear aperturas.
+    URL esperada: /pixel?email=EMAIL&name=NAME
+    """
+    email = request.args.get("email", "").strip()
+    name = request.args.get("name", "there").strip()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Guardar en el log local de PythonAnywhere y Google Sheets
+    try:
+        if email:
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] APERTURA | Email: {email} | Name: {name}\n")
+            
+            # Sincronizar con Google Sheets (Métricas (2) y MEMORIA_INFINITA (2))
+            try:
+                ws_metrics = get_sheet("Métricas (2)")
+                ws_infinita = get_sheet("MEMORIA_INFINITA (2)")
+                row = [timestamp, "F1_APERTURA", email, name, "Desconocido", "Apertura silenciosa por píxel (PythonAnywhere)"]
+                
+                if ws_metrics:
+                    ws_metrics.append_row(row, value_input_option="USER_ENTERED")
+                    # Incrementar el contador de aperturas en F1
+                    val = ws_metrics.acell('B4').value
+                    ws_metrics.update_acell('B4', int(val) + 1 if val and val.isdigit() else 1)
+                
+                if ws_infinita:
+                    ws_infinita.append_row(row, value_input_option="USER_ENTERED")
+            except Exception as sheet_err:
+                logging.error(f"Error subiendo a Sheets: {sheet_err}")
+
+    except Exception as e:
+        logging.error(f"Error guardando log de apertura: {e}")
+
+    # Devolver un GIF transparente de 1x1 píxel
+    from flask import Response
+    pixel_data = b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b'
+    return Response(pixel_data, mimetype="image/gif")
 
 
 # ─── LEGADO: /si redirige a /track ───────────────────────────────────────────
