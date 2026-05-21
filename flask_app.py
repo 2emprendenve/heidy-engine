@@ -147,7 +147,7 @@ def pixel():
             with open(LOG_FILE, "a", encoding="utf-8") as f:
                 f.write(f"[{timestamp}] APERTURA | Email: {email} | Name: {name}\n")
             
-            # Sincronizar con Google Sheets (Métricas (2) y MEMORIA_INFINITA (2))
+            # Sincronizar con Google Sheets (Métricas (2), MEMORIA_INFINITA (2), y marcar ABIERTO en leads)
             try:
                 ws_metrics = get_sheet("Métricas (2)")
                 ws_infinita = get_sheet("MEMORIA_INFINITA (2)")
@@ -161,6 +161,32 @@ def pixel():
                 
                 if ws_infinita:
                     ws_infinita.append_row(row, value_input_option="USER_ENTERED")
+
+                # ── NUEVO: Marcar lead como ABIERTO en 1_OUTBOX_MICRO2 ──
+                ws_leads = get_sheet("1_OUTBOX_MICRO2")
+                if ws_leads:
+                    try:
+                        headers = ws_leads.row_values(1)
+                        if "EMAIL" in headers:
+                            email_col = headers.index("EMAIL") + 1
+                            status_col = None
+                            if "HEIDY_STATUS" in headers:
+                                status_col = headers.index("HEIDY_STATUS") + 1
+                            elif "STATUS_ENVIO" in headers:
+                                status_col = headers.index("STATUS_ENVIO") + 1
+
+                            if status_col:
+                                for idx, val in enumerate(ws_leads.col_values(email_col), start=1):
+                                    if val.strip().lower() == email.lower():
+                                        # Solo marcar ABIERTO si el estado actual no es CLICKED o superior
+                                        current = ws_leads.cell(idx, status_col).value or ""
+                                        if current.upper() not in ("CLICKED", "INTERESADO", "VENDIDO"):
+                                            ws_leads.update_cell(idx, status_col, "ABIERTO")
+                                            logging.info(f"   ✓ Lead {email} marcado como ABIERTO en fila {idx}")
+                                        break
+                    except Exception as lead_err:
+                        logging.error(f"Error marcando ABIERTO en leads: {lead_err}")
+
             except Exception as sheet_err:
                 logging.error(f"Error subiendo a Sheets: {sheet_err}")
 
