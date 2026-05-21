@@ -2,8 +2,12 @@
 # Se importa en api_v2.py via: from drafts_api import register_drafts_routes
 import time
 import logging
+from datetime import datetime
 from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
+import gspread
+import config
+import engine_v2
 
 _draft_store = []   # list of {empresa, email, subject, html, lead, ai, approved}
 
@@ -124,16 +128,13 @@ def register_drafts_routes(app, get_sheet_fn, read_pending_fn, generate_batch_fn
                     # Marcar en Google Sheets
                     fila = d["lead"].get("_fila") or d["ai"].get("_fila")
                     if fila:
-                        import engine_v2
-                        from datetime import datetime
-                        import gspread
-                        import config
-                        # Escribir ESTADO_CONTACTO, FECHA_ENVIO, ASUNTO_ENVIADO
                         try:
                             headers = sheet.row_values(1)
                             updates = []
                             if config.COL_ESTADO in headers:
                                 updates.append(gspread.Cell(fila, headers.index(config.COL_ESTADO)+1, "ENVIADO"))
+                            elif "STATUS_ENVIO" in headers:
+                                updates.append(gspread.Cell(fila, headers.index("STATUS_ENVIO")+1, "ENVIADO"))
                             if "FECHA_ENVIO" in headers:
                                 updates.append(gspread.Cell(fila, headers.index("FECHA_ENVIO")+1, datetime.now().strftime("%Y-%m-%d %H:%M")))
                             if "ASUNTO_ENVIADO" in headers:
